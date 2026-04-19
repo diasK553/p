@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Система управления парковкой</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #0f0f13; color: #e0e0e0; }
+
+header {
+  background: #1a1a24;
+  border-bottom: 2px solid #f5c518;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 { font-size: 20px; color: #f5c518; }
+#header-stats { margin-left: auto; font-size: 14px; color: #aaa; }
+#header-stats span { color: #fff; font-weight: bold; }
+
+.tabs {
+  display: flex;
+  background: #1a1a24;
+  border-bottom: 1px solid #2a2a3a;
+  padding: 0 16px;
+}
+.tab {
+  padding: 12px 20px;
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: #ccc; }
+.tab.active { color: #f5c518; border-bottom-color: #f5c518; }
+
+.content { padding: 24px; max-width: 900px; margin: 0 auto; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.card {
+  background: #1a1a24;
+  border: 1px solid #2a2a3a;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card h2 { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+
+.row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+.field label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.field input, .field select {
+  background: #0f0f13;
+  border: 1px solid #2a2a3a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+.field input:focus, .field select:focus { border-color: #f5c518; }
+.field select option { background: #1a1a24; }
+
+.btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.85; }
+.btn-yellow { background: #f5c518; color: #000; }
+.btn-green  { background: #39d98a; color: #000; }
+.btn-red    { background: #ff4d6d; color: #fff; }
+.btn-gray   { background: #2a2a3a; color: #ddd; }
+
+.msg {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  display: none;
+}
+.msg.ok  { background: rgba(57,217,138,0.12); color: #39d98a; border-left: 3px solid #39d98a; }
+.msg.err { background: rgba(255,77,109,0.12);  color: #ff4d6d; border-left: 3px solid #ff4d6d; }
+.msg.show { display: block; }
+
+.spots { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.spot { border-radius: 8px; padding: 12px 8px; text-align: center; border: 1px solid; }
+.spot.free     { background: rgba(57,217,138,0.08); border-color: rgba(57,217,138,0.3); }
+.spot.occupied { background: rgba(255,77,109,0.08); border-color: rgba(255,77,109,0.3); }
+.spot-num  { font-size: 10px; color: #666; margin-bottom: 4px; }
+.spot-icon { font-size: 24px; margin-bottom: 4px; }
+.spot-info { font-size: 10px; word-break: break-all; }
+.free-txt  { color: #39d98a; }
+.occ-txt   { color: #ddd; }
+.spot-time { font-size: 9px; color: #666; margin-top: 2px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 8px 12px; text-align: left; color: #666; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #2a2a3a; }
+td { padding: 10px 12px; border-bottom: 1px solid #1e1e2a; }
+tr:last-child td { border: none; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+.badge-car   { background: rgba(245,197,24,0.15);  color: #f5c518; }
+.badge-truck { background: rgba(255,107,53,0.15);  color: #ff6b35; }
+.badge-moto  { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+.empty { text-align: center; padding: 32px; color: #555; }
+
+.result-box {
+  margin-top: 14px;
+  padding: 14px;
+  background: #0f0f13;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+  display: none;
+}
+.result-box.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="font-size:28px">&#x1F17F;&#xFE0F;</div>
+  <h1>Система управления парковкой</h1>
+  <div id="header-stats">Свободно: <span id="h-free">…</span> | Занято: <span id="h-occ">…</span></div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="go('status')">Статус</button>
+  <button class="tab" onclick="go('register')">Регистрация</button>
+  <button class="tab" onclick="go('enter')">Въезд</button>
+  <button class="tab" onclick="go('exit')">Выезд</button>
+  <button class="tab" onclick="go('search')">Поиск</button>
+  <button class="tab" onclick="go('history')">История</button>
+</div>
+
+<div class="content">
+
+  <!-- СТАТУС -->
+  <div class="panel active" id="panel-status">
+    <div class="card">
+      <h2>Карта парковки</h2>
+      <div class="spots" id="spots-grid">
+        <div class="empty">Загрузка…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- РЕГИСТРАЦИЯ -->
+  <div class="panel" id="panel-register">
+    <div class="card">
+      <h2>Зарегистрировать ТС</h2>
+      <div class="row">
+        <div class="field">
+          <label>Номерной знак</label>
+          <input id="r-plate" placeholder="ADG 427" type="text">
+        </div>
+        <div class="field">
+          <label>Владелец</label>
+          <input id="r-owner" placeholder="Иван Иванов" type="text">
+        </div>
+        <div class="field">
+          <label>Тип ТС</label>
+          <select id="r-type">
+            <option value="car">Легковой — 500 тг/ч</option>
+            <option value="truck">Грузовой — 1200 тг/ч</option>
+            <option value="motorcycle">Мотоцикл — 250 тг/ч</option>
+          </select>
+        </div>
+        <button class="btn btn-yellow" onclick="doRegister()">Зарегистрировать</button>
+      </div>
+      <div class="msg" id="r-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Зарегистрированные ТС</h2>
+      <table>
+        <thead><tr><th>Номер</th><th>Владелец</th><th>Тип</th><th>Тариф</th></tr></thead>
+        <tbody id="reg-table"><tr><td colspan="4"><div class="empty">Нет данных</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ВЪЕЗД -->
+  <div class="panel" id="panel-enter">
+    <div class="card">
+      <h2>Въезд на парковку</h2>
+      <div class="row">
+        <div class="field">
+          <label>Номерной знак</label>
+          <input id="e-plate" placeholder="ADG 427" type="text">
+        </div>
+        <button class="btn btn-green" onclick="doEnter()">Въехать</button>
+      </div>
+      <div class="msg" id="e-msg"></div>
+    </div>
+  </div>
+
+  <!-- ВЫЕЗД -->
+  <div class="panel" id="panel-exit">
+    <div class="card">
+      <h2>Выезд с парковки</h2>
+      <div class="row">
+        <div class="field">
+          <label>Номерной знак</label>
+          <input id="x-plate" placeholder="ADG 427" type="text">
+        </div>
+        <button class="btn btn-red" onclick="doExit()">Выехать</button>
+      </div>
+      <div class="msg" id="x-msg"></div>
+      <div class="result-box" id="x-result"></div>
+    </div>
+  </div>
+
+  <!-- ПОИСК -->
+  <div class="panel" id="panel-search">
+    <div class="card">
+      <h2>Поиск автомобиля</h2>
+      <div class="row">
+        <div class="field">
+          <label>Номерной знак</label>
+          <input id="s-plate" placeholder="ADG 427" type="text">
+        </div>
+        <button class="btn btn-gray" onclick="doSearch()">Найти</button>
+      </div>
+      <div class="result-box" id="s-result"></div>
+    </div>
+  </div>
+
+  <!-- ИСТОРИЯ -->
+  <div class="panel" id="panel-history">
+    <div class="card">
+      <h2>История посещений</h2>
+      <table>
+        <thead><tr><th>Номер</th><th>Владелец</th><th>Место</th><th>Въезд</th><th>Выезд</th><th>Мин</th><th>Стоимость</th></tr></thead>
+        <tbody id="hist-table"><tr><td colspan="7"><div class="empty">Пусто</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var tabs = ['status','register','enter','exit','search','history'];
+
+function go(name) {
+  var btns = document.querySelectorAll('.tab');
+  tabs.forEach(function(t, i) { btns[i].classList.toggle('active', t === name); });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'status')   loadStatus();
+  if (name === 'register') loadRegistry();
+  if (name === 'history')  loadHistory();
+}
+
+function showMsg(id, text, ok) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'ok' : 'err') + ' show';
+  setTimeout(function() { el.classList.remove('show'); }, 4000);
+}
+
+function getIcon(type) {
+  if (type.indexOf('руз') !== -1) return '🚛';
+  if (type.indexOf('ото') !== -1) return '🏍';
+  return '🚗';
+}
+
+function getBadge(type) {
+  if (type.indexOf('руз') !== -1) return '<span class="badge badge-truck">Грузовой</span>';
+  if (type.indexOf('ото') !== -1) return '<span class="badge badge-moto">Мотоцикл</span>';
+  return '<span class="badge badge-car">Легковой</span>';
+}
+
+function loadStatus() {
+  fetch('/api/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('h-free').textContent = d.free_count;
+      document.getElementById('h-occ').textContent  = d.occupied_count;
+      var html = '';
+      d.spots.forEach(function(s) {
+        if (s.is_occupied) {
+          html += '<div class="spot occupied">'
+            + '<div class="spot-num">#' + s.spot_id + '</div>'
+            + '<div class="spot-icon">' + getIcon(s.vehicle.type) + '</div>'
+            + '<div class="spot-info occ-txt">' + s.vehicle.plate + '</div>'
+            + '<div class="spot-time">' + s.elapsed_min + ' мин</div>'
+            + '</div>';
+        } else {
+          html += '<div class="spot free">'
+            + '<div class="spot-num">#' + s.spot_id + '</div>'
+            + '<div class="spot-icon">✅</div>'
+            + '<div class="spot-info free-txt">свободно</div>'
+            + '</div>';
+        }
+      });
+      document.getElementById('spots-grid').innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('spots-grid').innerHTML = '<div class="empty">Ошибка загрузки</div>';
+    });
+}
+
+function doRegister() {
+  var plate = document.getElementById('r-plate').value.trim();
+  var owner = document.getElementById('r-owner').value.trim();
+  var type  = document.getElementById('r-type').value;
+  if (!plate || !owner) { showMsg('r-msg', 'Заполните все поля', false); return; }
+
+  fetch('/api/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({plate: plate, owner: owner, type: type})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      showMsg('r-msg', '✅ ' + d.message, true);
+      document.getElementById('r-plate').value = '';
+      document.getElementById('r-owner').value = '';
+      loadRegistry();
+    } else {
+      showMsg('r-msg', '❌ ' + d.error, false);
+    }
+  });
+}
+
+function loadRegistry() {
+  fetch('/api/registry')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var tb = document.getElementById('reg-table');
+      if (!d.length) { tb.innerHTML = '<tr><td colspan="4"><div class="empty">Нет ТС</div></td></tr>'; return; }
+      var html = '';
+      d.forEach(function(v) {
+        html += '<tr><td>' + v.plate + '</td><td>' + v.owner + '</td><td>' + getBadge(v.type) + '</td><td>' + v.rate + ' тг/ч</td></tr>';
+      });
+      tb.innerHTML = html;
+    });
+}
+
+function doEnter() {
+  var plate = document.getElementById('e-plate').value.trim();
+  if (!plate) { showMsg('e-msg', 'Введите номер', false); return; }
+  fetch('/api/enter', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({plate: plate})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      showMsg('e-msg', '🟢 ' + d.message, true);
+      document.getElementById('e-plate').value = '';
+    } else {
+      showMsg('e-msg', '❌ ' + d.error, false);
+    }
+  });
+}
+
+function doExit() {
+  var plate = document.getElementById('x-plate').value.trim();
+  if (!plate) { showMsg('x-msg', 'Введите номер', false); return; }
+  fetch('/api/exit', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({plate: plate})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var box = document.getElementById('x-result');
+    if (d.success) {
+      showMsg('x-msg', '🔴 Выезд оформлен', true);
+      var rec = d.record;
+      box.innerHTML = '<b>' + rec.plate + '</b> · ' + rec.owner + '<br>'
+        + 'Место #' + rec.spot_id + ' · ' + rec.entry + ' → ' + rec.exit + '<br>'
+        + 'Время: ' + rec.duration_min + ' мин &nbsp;|&nbsp; '
+        + '<b style="color:#f5c518">Итого: ' + rec.cost + ' тг</b>';
+      box.className = 'result-box show';
+      document.getElementById('x-plate').value = '';
+    } else {
+      showMsg('x-msg', '❌ ' + d.error, false);
+      box.classList.remove('show');
+    }
+  });
+}
+
+function doSearch() {
+  var plate = document.getElementById('s-plate').value.trim();
+  if (!plate) return;
+  fetch('/api/search?plate=' + encodeURIComponent(plate))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var box = document.getElementById('s-result');
+      if (d.status === 'on_parking')
+        box.innerHTML = '🟢 <b>' + plate.toUpperCase() + '</b> — место #' + d.spot_id + ', на парковке ' + d.elapsed_min + ' мин';
+      else if (d.status === 'registered')
+        box.innerHTML = '🟡 <b>' + plate.toUpperCase() + '</b> — зарегистрирован, но не на парковке';
+      else
+        box.innerHTML = '❌ <b>' + plate.toUpperCase() + '</b> — не найден';
+      box.className = 'result-box show';
+    });
+}
+
+function loadHistory() {
+  fetch('/api/history')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var tb = document.getElementById('hist-table');
+      if (!d.length) { tb.innerHTML = '<tr><td colspan="7"><div class="empty">Пусто</div></td></tr>'; return; }
+      var html = '';
+      d.slice().reverse().forEach(function(rec) {
+        html += '<tr>'
+          + '<td>' + rec.plate + '</td>'
+          + '<td>' + rec.owner + '</td>'
+          + '<td>#' + rec.spot_id + '</td>'
+          + '<td>' + rec.entry + '</td>'
+          + '<td>' + rec.exit + '</td>'
+          + '<td>' + rec.duration_min + '</td>'
+          + '<td style="color:#f5c518;font-weight:bold">' + rec.cost + ' тг</td>'
+          + '</tr>';
+      });
+      tb.innerHTML = html;
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var active = document.querySelector('.panel.active').id;
+  if (active === 'panel-register') doRegister();
+  if (active === 'panel-enter')    doEnter();
+  if (active === 'panel-exit')     doExit();
+  if (active === 'panel-search')   doSearch();
+});
+
+loadStatus();
+setInterval(loadStatus, 10000);
+</script>
+</body>
+</html>
