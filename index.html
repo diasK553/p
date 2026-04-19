@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🅿 Система управления парковкой</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #f5c518;
+    --accent2: #ff6b35;
+    --green: #39d98a;
+    --red: #ff4d6d;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --card: #16161f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,197,24,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,197,24,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    color: #000;
+    font-weight: 800;
+  }
+  .logo-text {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo-text span { color: var(--accent); }
+
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+  }
+  .stat { display: flex; align-items: center; gap: 8px; }
+  .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot-red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .stat-val { color: var(--text); font-weight: 700; }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 24px 0 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Panels ── */
+  .panel { display: none; animation: fadeIn 0.3s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 8px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  input, select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--surface); }
+
+  .btn {
+    padding: 11px 24px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #ffd84d; transform: translateY(-1px); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #ff6b83; transform: translateY(-1px); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .toast {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    display: none;
+    border-left: 3px solid;
+  }
+  .toast.success { background: rgba(57,217,138,0.1); border-color: var(--green); color: var(--green); }
+  .toast.error { background: rgba(255,77,109,0.1); border-color: var(--red); color: var(--red); }
+  .toast.show { display: block; }
+
+  /* ── Parking grid ── */
+  .spots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+  }
+  .spot {
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+    border: 1px solid;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .spot.free {
+    background: rgba(57,217,138,0.06);
+    border-color: rgba(57,217,138,0.2);
+  }
+  .spot.occupied {
+    background: rgba(255,77,109,0.06);
+    border-color: rgba(255,77,109,0.2);
+  }
+  .spot-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .spot-icon { font-size: 22px; margin-bottom: 4px; }
+  .spot-plate {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .spot-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(30,30,46,0.5);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(245,197,24,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .badge-car { background: rgba(245,197,24,0.15); color: var(--accent); }
+  .badge-truck { background: rgba(255,107,53,0.15); color: var(--accent2); }
+  .badge-moto { background: rgba(139,92,246,0.15); color: #a78bfa; }
+
+  .search-row { display: flex; gap: 12px; align-items: flex-end; }
+  .search-row .form-group { flex: 1; }
+  .search-result {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    display: none;
+  }
+  .search-result.show { display: block; }
+
+  .empty {
+    text-align: center;
+    padding: 48px 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .stats-bar { display: none; }
+    .tabs { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">P</div>
+        <div class="logo-text">Parking<span>OS</span></div>
+      </div>
+      <div class="stats-bar" id="headerStats">
+        <div class="stat">
+          <div class="stat-dot dot-green"></div>
+          <span id="hFree">—</span> свободно
+        </div>
+        <div class="stat">
+          <div class="stat-dot dot-red"></div>
+          <span id="hOccupied">—</span> занято
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('status')">📊 Статус</button>
+    <button class="tab" onclick="switchTab('register')">➕ Регистрация</button>
+    <button class="tab" onclick="switchTab('enter')">🟢 Въезд</button>
+    <button class="tab" onclick="switchTab('exit')">🔴 Выезд</button>
+    <button class="tab" onclick="switchTab('search')">🔍 Поиск</button>
+    <button class="tab" onclick="switchTab('history')">📋 История</button>
+  </div>
+
+  <!-- ── СТАТУС ── -->
+  <div class="panel active" id="panel-status">
+    <div class="card">
+      <div class="card-title">Карта парковки</div>
+      <div class="spots-grid" id="spotsGrid">
+        <div class="empty"><div class="empty-icon">⏳</div>Загрузка...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── РЕГИСТРАЦИЯ ── -->
+  <div class="panel" id="panel-register">
+    <div class="card">
+      <div class="card-title">Зарегистрировать транспортное средство</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Номерной знак</label>
+          <input type="text" id="reg-plate" placeholder="ADG 427" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Владелец</label>
+          <input type="text" id="reg-owner" placeholder="Иван Иванов" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Тип ТС</label>
+          <select id="reg-type">
+            <option value="car">🚗 Легковой — 500 ₸/ч</option>
+            <option value="truck">🚛 Грузовой — 1200 ₸/ч</option>
+            <option value="motorcycle">🏍️ Мотоцикл — 250 ₸/ч</option>
+          </select>
+        </div>
+        <div class="form-group" style="justify-content: flex-end;">
+          <button class="btn btn-primary" onclick="registerVehicle()">Зарегистрировать</button>
+        </div>
+      </div>
+      <div class="toast" id="reg-toast"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Зарегистрированные ТС</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Номер</th><th>Владелец</th><th>Тип</th><th>Тариф</th></tr></thead>
+          <tbody id="regTable"><tr><td colspan="4" class="empty">Нет данных</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ВЪЕЗД ── -->
+  <div class="panel" id="panel-enter">
+    <div class="card">
+      <div class="card-title">Въезд на парковку</div>
+      <div class="search-row">
+        <div class="form-group">
+          <label>Номерной знак</label>
+          <input type="text" id="enter-plate" placeholder="ADG 427" autocomplete="off">
+        </div>
+        <button class="btn btn-primary" onclick="enterParking()">Въехать 🟢</button>
+      </div>
+      <div class="toast" id="enter-toast"></div>
+    </div>
+  </div>
+
+  <!-- ── ВЫЕЗД ── -->
+  <div class="panel" id="panel-exit">
+    <div class="card">
+      <div class="card-title">Выезд с парковки</div>
+      <div class="search-row">
+        <div class="form-group">
+          <label>Номерной знак</label>
+          <input type="text" id="exit-plate" placeholder="ADG 427" autocomplete="off">
+        </div>
+        <button class="btn btn-danger" onclick="exitParking()">Выехать 🔴</button>
+      </div>
+      <div class="toast" id="exit-toast"></div>
+      <div class="search-result" id="exit-result"></div>
+    </div>
+  </div>
+
+  <!-- ── ПОИСК ── -->
+  <div class="panel" id="panel-search">
+    <div class="card">
+      <div class="card-title">Поиск автомобиля</div>
+      <div class="search-row">
+        <div class="form-group">
+          <label>Номерной знак</label>
+          <input type="text" id="search-plate" placeholder="ADG 427" autocomplete="off">
+        </div>
+        <button class="btn btn-outline" onclick="searchVehicle()">Найти 🔍</button>
+      </div>
+      <div class="search-result" id="search-result"></div>
+    </div>
+  </div>
+
+  <!-- ── ИСТОРИЯ ── -->
+  <div class="panel" id="panel-history">
+    <div class="card">
+      <div class="card-title">История посещений</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Номер</th><th>Владелец</th><th>Место</th><th>Въезд</th><th>Выезд</th><th>Время</th><th>Стоимость</th></tr></thead>
+          <tbody id="histTable">
+            <tr><td colspan="7"><div class="empty"><div class="empty-icon">📭</div>История пуста</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', t.getAttribute('onclick').includes(name));
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+
+  if (name === 'status') loadStatus();
+  if (name === 'register') loadRegistry();
+  if (name === 'history') loadHistory();
+}
+
+// ── Toast ──
+function showToast(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── Status ──
+async function loadStatus() {
+  const res = await fetch('/api/status');
+  const data = await res.json();
+
+  document.getElementById('hFree').textContent = data.free_count;
+  document.getElementById('hOccupied').textContent = data.occupied_count;
+
+  const grid = document.getElementById('spotsGrid');
+  grid.innerHTML = data.spots.map(s => {
+    if (s.is_occupied) {
+      const icon = getIcon(s.vehicle.type);
+      return `<div class="spot occupied">
+        <div class="spot-num">#${s.spot_id}</div>
+        <div class="spot-icon">${icon}</div>
+        <div class="spot-plate">${s.vehicle.plate}</div>
+        <div class="spot-time">${s.elapsed_min} мин</div>
+      </div>`;
+    }
+    return `<div class="spot free">
+      <div class="spot-num">#${s.spot_id}</div>
+      <div class="spot-icon">✅</div>
+      <div class="spot-plate" style="color:var(--green)">свободно</div>
+    </div>`;
+  }).join('');
+}
+
+function getIcon(type) {
+  if (type.includes('Грузовой')) return '🚛';
+  if (type.includes('Мотоцикл')) return '🏍️';
+  return '🚗';
+}
+
+function getBadge(type) {
+  if (type.includes('Грузовой')) return `<span class="badge badge-truck">Грузовой</span>`;
+  if (type.includes('Мотоцикл')) return `<span class="badge badge-moto">Мотоцикл</span>`;
+  return `<span class="badge badge-car">Легковой</span>`;
+}
+
+// ── Register ──
+async function registerVehicle() {
+  const plate = document.getElementById('reg-plate').value;
+  const owner = document.getElementById('reg-owner').value;
+  const type = document.getElementById('reg-type').value;
+
+  const res = await fetch('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate, owner, type })
+  });
+  const data = await res.json();
+
+  if (data.success) {
+    showToast('reg-toast', '✅ ' + data.message, 'success');
+    document.getElementById('reg-plate').value = '';
+    document.getElementById('reg-owner').value = '';
+    loadRegistry();
+  } else {
+    showToast('reg-toast', '❌ ' + data.error, 'error');
+  }
+}
+
+async function loadRegistry() {
+  const res = await fetch('/api/registry');
+  const data = await res.json();
+  const tbody = document.getElementById('regTable');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty">Нет зарегистрированных ТС</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(v => `
+    <tr>
+      <td>${v.plate}</td>
+      <td>${v.owner}</td>
+      <td>${getBadge(v.type)}</td>
+      <td>${v.rate} ₸/ч</td>
+    </tr>
+  `).join('');
+}
+
+// ── Enter ──
+async function enterParking() {
+  const plate = document.getElementById('enter-plate').value;
+  const res = await fetch('/api/enter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate })
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('enter-toast', '🟢 ' + data.message, 'success');
+    document.getElementById('enter-plate').value = '';
+  } else {
+    showToast('enter-toast', '❌ ' + data.error, 'error');
+  }
+}
+
+// ── Exit ──
+async function exitParking() {
+  const plate = document.getElementById('exit-plate').value;
+  const res = await fetch('/api/exit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate })
+  });
+  const data = await res.json();
+  const resultEl = document.getElementById('exit-result');
+  if (data.success) {
+    showToast('exit-toast', '🔴 Выезд оформлен', 'success');
+    const r = data.record;
+    resultEl.innerHTML = `
+      <b>${r.plate}</b> · ${r.owner}<br>
+      Место #${r.spot_id} · ${r.entry} → ${r.exit}<br>
+      Время: ${r.duration_min} мин &nbsp;|&nbsp; <b style="color:var(--accent)">Итого: ${r.cost} ₸</b>
+    `;
+    resultEl.className = 'search-result show';
+    document.getElementById('exit-plate').value = '';
+  } else {
+    showToast('exit-toast', '❌ ' + data.error, 'error');
+    resultEl.classList.remove('show');
+  }
+}
+
+// ── Search ──
+async function searchVehicle() {
+  const plate = document.getElementById('search-plate').value;
+  const res = await fetch('/api/search?plate=' + encodeURIComponent(plate));
+  const data = await res.json();
+  const el = document.getElementById('search-result');
+
+  if (data.status === 'on_parking') {
+    el.innerHTML = `🟢 <b>${plate.toUpperCase()}</b> — место #${data.spot_id}, на парковке ${data.elapsed_min} мин`;
+    el.style.borderColor = 'var(--green)';
+  } else if (data.status === 'registered') {
+    el.innerHTML = `🟡 <b>${plate.toUpperCase()}</b> — зарегистрирован, но сейчас не на парковке`;
+    el.style.borderColor = 'var(--accent)';
+  } else {
+    el.innerHTML = `❌ <b>${plate.toUpperCase()}</b> — не найден в системе`;
+    el.style.borderColor = 'var(--red)';
+  }
+  el.className = 'search-result show';
+}
+
+// ── History ──
+async function loadHistory() {
+  const res = await fetch('/api/history');
+  const data = await res.json();
+  const tbody = document.getElementById('histTable');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">📭</div>История пуста</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = [...data].reverse().map(r => `
+    <tr>
+      <td>${r.plate}</td>
+      <td>${r.owner}</td>
+      <td>#${r.spot_id}</td>
+      <td>${r.entry}</td>
+      <td>${r.exit}</td>
+      <td>${r.duration_min} мин</td>
+      <td style="color:var(--accent);font-weight:700">${r.cost} ₸</td>
+    </tr>
+  `).join('');
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const active = document.querySelector('.panel.active').id;
+  if (active === 'panel-enter') enterParking();
+  if (active === 'panel-exit') exitParking();
+  if (active === 'panel-search') searchVehicle();
+});
+
+// Init
+loadStatus();
+setInterval(loadStatus, 15000);
+</script>
+</body>
+</html>
